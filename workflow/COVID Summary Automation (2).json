@@ -1,0 +1,406 @@
+{
+  "name": "COVID Summary Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ce45ee86-4878-44b9-ae20-573431ebbc7d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fileSelector": "C:\\Users\\nikhi\\.n8n-files\\covid_eda_task4.xlsx - Raw_Data.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        0
+      ],
+      "id": "8d23bf32-a289-4dba-8629-7c2ec0be99ab",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        0
+      ],
+      "id": "a44c1990-a187-46c3-91d2-dbe9c346b3d5",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a COVID data analyst. Provide brief summary, key trends and alerts in under 200 words.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"={{ $('Code in JavaScript').first().json.summaryText }}\"\n    }\n  ],\n  \"max_tokens\": 300\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        832,
+        0
+      ],
+      "id": "5668ac67-4cb3-40f9-9f47-708639c862c1",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nlet summaryText = \"Analyze this COVID India data: \";\n\nfor(let i = 0; i < rows.length && i < 10; i++) {\n  const row = rows[i];\n  if(row && row.json) {\n    const data = row.json;\n    summaryText += `State: ${data.State}, Date: ${data.Date}, Confirmed: ${data.Confirmed}, Deaths: ${data.Deaths}, Recovered: ${data.Cured}, Daily Cases: ${data['Daily New Cases']}. `;\n  }\n}\n\nreturn [{ json: { summaryText: summaryText.trim() } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        0
+      ],
+      "id": "74e15b14-dce1-4788-98cd-4212ec10f993",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst aiSummary = response.choices[0].message.content;\nconst timestamp = new Date().toISOString();\n\nconst report = `COVID DASHBOARD REPORT\nGenerated: ${timestamp}\n\nAI ANALYSIS:\n${aiSummary}`;\n\nconst base64Report = Buffer.from(report, 'utf8').toString('base64');\n\nreturn [{ \n  json: { report, aiSummary },\n  binary: {\n    'covid_report': {\n      data: base64Report,\n      mimeType: 'text/plain',\n      fileExtension: 'txt',\n      fileName: 'covid_report.txt'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "fff2f890-00bc-4425-b50a-895bea828e2f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "C:\\Users\\nikhi\\.n8n-files\\covid_report.txt",
+        "dataPropertyName": "covid_report",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        -32
+      ],
+      "id": "8ff5ef43-b3fc-454a-be8b-218df611f869",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "U0AGN7206AY",
+          "mode": "id"
+        },
+        "text": "={{ $json.report }}\n\n🚨 RISK CONDITIONS DETECTED!\nRising Cases: {{ $json.riskConditions.risingCases }}\nHigh Positivity: {{ $json.riskConditions.highPositivity }}\nLow Vaccination: {{ $json.riskConditions.lowVaccination }}\n🔴 IMMEDIATE ATTENTION REQUIRED!",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1680,
+        -144
+      ],
+      "id": "49a60bf8-76b0-4618-a5b4-c8233c7641a4",
+      "name": "Send a message",
+      "webhookId": "1044f6d2-6c61-4710-9a83-6e83bc0fb881",
+      "credentials": {
+        "slackApi": {
+          "id": "Mjt1MKoogP6UP3jg",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reportData = $input.first().json;\n\n// Safety check\nconst aiSummary = reportData.aiSummary ? \n                  reportData.aiSummary.toLowerCase() : \n                  reportData.report ? \n                  reportData.report.toLowerCase() : '';\n\n// Check risk conditions from AI summary\nconst risingCases = aiSummary.includes('rising') || \n                    aiSummary.includes('increase');\n\nconst highPositivity = aiSummary.includes('positivity') || \n                       aiSummary.includes('positive rate');\n\nconst lowVaccination = aiSummary.includes('vaccination') && \n                       aiSummary.includes('low');\n\nconst overallRisk = (risingCases || highPositivity || lowVaccination) ? \n                    'HIGH' : 'LOW';\n\nreturn [{ \n  json: { \n    ...reportData,\n    riskConditions: {\n      risingCases,\n      highPositivity,\n      lowVaccination,\n      overallRisk\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        0
+      ],
+      "id": "092d36ef-7d31-4860-abcf-9a855dccaef1",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1b2f0e68-3cad-4119-88db-7c93d4059344",
+              "leftValue": "={{ $json.riskConditions.overallRisk }}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1408,
+        0
+      ],
+      "id": "f4e3a6ac-e007-496a-b91d-be4b9a4f82de",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "U0AGN7206AY",
+          "mode": "id"
+        },
+        "text": "={{ $json.report }}  🟢 Risk Status: NORMAL No immediate action required.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1680,
+        96
+      ],
+      "id": "e56a2545-7672-4455-ad33-f3d9192da24b",
+      "name": "Send a message1",
+      "webhookId": "c6cc1a81-61d1-4f4d-b042-99c0809871f8",
+      "credentials": {
+        "slackApi": {
+          "id": "Mjt1MKoogP6UP3jg",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst report = data.report || data.alertMessage || '';\n\nconst base64Report = Buffer.from(report, 'utf8').toString('base64');\n\nreturn [{ \n  json: { report },\n  binary: {\n    'covid_report': {\n      data: base64Report,\n      mimeType: 'text/plain',\n      fileExtension: 'txt',\n      fileName: 'covid_report.txt'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        -32
+      ],
+      "id": "09942b6e-a795-4f2a-8aeb-a2f43d4f5b45",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "timestamp": "2026-04-22T03:17:12.965-04:00",
+          "Readable date": "April 22nd 2026, 3:17:12 am",
+          "Readable time": "3:17:12 am",
+          "Day of week": "Wednesday",
+          "Year": "2026",
+          "Month": "April",
+          "Day of month": "22",
+          "Hour": "03",
+          "Minute": "17",
+          "Second": "12",
+          "Timezone": "Asia/Kolkata"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "91f92242-33e1-4b93-a990-ad6019ed600c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4ea3fe0fceee7f9baf9f27df8dd32e1a04506792ac950c98a88c54615ed23e92"
+  },
+  "id": "Qs7jzUcmyD25JJw9",
+  "tags": []
+}
